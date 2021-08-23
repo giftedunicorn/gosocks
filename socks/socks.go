@@ -4,6 +4,7 @@ package socks
 import (
     "io"
     "net"
+    "log"
     "strconv"
 )
 
@@ -80,6 +81,7 @@ func readAddr(r io.Reader, b []byte) (Addr, error) {
 
 // Handshake fast-tracks SOCKS initialization to get target address to connect.
 func Handshake(rw io.ReadWriter) (Addr, error) {
+    // log.Println("buf", rw)
     // Read RFC 1928 for request and reply structure and sizes.
     buf := make([]byte, MaxAddrLen)
     // read VER, NMETHODS, METHODS
@@ -106,19 +108,21 @@ func Handshake(rw io.ReadWriter) (Addr, error) {
     switch cmd {
     case CmdConnect:
         _, err = rw.Write([]byte{5, 0, 0, 1, 0, 0, 0, 0, 0, 0}) // SOCKS v5, reply succeeded
-    case CmdUDPAssociate:
-        if !UDPEnabled {
-            return nil, ErrCommandNotSupported
-        }
-        listenAddr := ParseAddr(rw.(net.Conn).LocalAddr().String())
-        _, err = rw.Write(append([]byte{5, 0, 0}, listenAddr...)) // SOCKS v5, reply succeeded
-        if err != nil {
-            return nil, ErrCommandNotSupported
-        }
-        err = InfoUDPAssociate
+    // case CmdUDPAssociate:
+    //     if !UDPEnabled {
+    //         return nil, ErrCommandNotSupported
+    //     }
+    //     listenAddr := ParseAddr(rw.(net.Conn).LocalAddr().String())
+    //     _, err = rw.Write(append([]byte{5, 0, 0}, listenAddr...)) // SOCKS v5, reply succeeded
+    //     if err != nil {
+    //         return nil, ErrCommandNotSupported
+    //     }
+    //     err = InfoUDPAssociate
     default:
         return nil, ErrCommandNotSupported
     }
 
+    // log.Println("buf", buf)
+    log.Println("addr", addr)
     return addr, err // skip VER, CMD, RSV fields
 }
