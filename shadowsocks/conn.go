@@ -62,6 +62,9 @@ func DialWithRawAddr(rawaddr []byte, server string, cipher *Cipher) (c *Conn, er
 		return
 	}
 	c = NewConn(conn, cipher)
+	// why send target address to remote server?
+	// remove it will cause it stop working. it lets remote server create a connection with the target address.
+	// the client <--> local <--> server <--> target stream will be created, then start relay.
 	if _, err = c.Write(rawaddr); err != nil {
 		c.Close()
 		return nil, err

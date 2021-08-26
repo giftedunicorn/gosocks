@@ -174,7 +174,7 @@ func createServerConn(rawaddr []byte) (remote *ss.Conn, err error) {
 		log.Println("error connecting to shadowsocks server:", err)
 		return nil, err
 	}
-	log.Printf("connected to %s via %s\n", server)
+	log.Printf("connected to %s via %s\n", string(rawaddr), server.srvCipher.server)
 	return
 }
 
