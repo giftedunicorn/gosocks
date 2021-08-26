@@ -8,13 +8,13 @@ import (
 	"os"
 	"strconv"
 
-	// "github.com/giftedunicorn/gosocks/socks"
-	"github.com/armon/go-socks5"
+	ss "github.com/giftedunicorn/gosocks/shadowsocks"
 )
 
 const localAddr = ":8080"
-const server = ":8081"
+const serverAddr = "207.246.96.188:47332"
 
+// Addr represents a SOCKS address as defined in RFC 1928 section 5.
 type Addr []byte
 
 // Error represents a SOCKS error
@@ -37,23 +37,29 @@ const (
 	InfoUDPAssociate        = Error(9)
 )
 
+type ServerCipher struct {
+	server string
+	cipher *ss.Cipher
+}
+
+var server struct {
+	srvCipher *ServerCipher
+	failCnt   []int // failed connection count
+}
+
 func main() {
-	// go createSocksServer()
+	getConfig()
 	startLocal()
 }
 
-func createSocksServer() {
-	// Create a SOCKS5 server
-	conf := &socks5.Config{}
-	server, err := socks5.New(conf)
+func getConfig() {
+	cipher, err := ss.NewCipher("aes-256-cfb", "KZQvdyhaw1NAHNLg")
 	if err != nil {
-		panic(err)
+		log.Println("Pick ciphter failed:", err)
+		return
 	}
 
-	// Create SOCKS5 proxy on localhost port 8000
-	if err := server.ListenAndServe("tcp", "127.0.0.1:8081"); err != nil {
-		panic(err)
-	}
+	server.srvCipher = &ServerCipher{serverAddr, cipher}
 }
 
 func startLocal() {
@@ -62,7 +68,7 @@ func startLocal() {
 		log.Println("failed to listen", err.Error())
 		os.Exit(1)
 	}
-	fmt.Printf("http://%v -> %s\n", l.Addr(), server)
+	fmt.Printf("http://%v -> %s\n", l.Addr(), serverAddr)
 
 	for {
 		c, err := l.Accept()
@@ -86,14 +92,12 @@ func handleConnection(c net.Conn) {
 	}
 	log.Println("target address", string(tgt))
 
-	rc, err := net.Dial("tcp", server)
+	rc, err := createServerConn(tgt)
 	if err != nil {
-		log.Println("failed to connect to server %v: %v", server, err)
+		log.Println("Failed to connect server", err)
 		return
 	}
 	defer rc.Close()
-
-	// todo, send encrypted packets
 
 	// reply
 	go io.Copy(rc, c)
@@ -166,34 +170,44 @@ func readAddr(r io.Reader, b []byte) (Addr, error) {
 	return nil, Error(8)
 }
 
+func createServerConn(rawaddr []byte) (remote *ss.Conn, err error) {
+	remote, err = ss.DialWithRawAddr(rawaddr, server.srvCipher.server, server.srvCipher.cipher.Copy())
+	if err != nil {
+		log.Println("error connecting to shadowsocks server:", err)
+		return nil, err
+	}
+	log.Println("connected to %s via %s\n", server)
+	return
+}
+
 // https://stackoverflow.com/questions/32135763/is-it-possible-to-transport-a-tcp-connection-over-websockets-or-another-protocol
-func run(inPort int, dest string) {
-	l, err := net.Listen("tcp", fmt.Sprintf(":%d", inPort))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	fmt.Printf("http://%v -> %s\n", l.Addr(), dest)
+// func run(inPort int, dest string) {
+// 	l, err := net.Listen("tcp", fmt.Sprintf(":%d", inPort))
+// 	if err != nil {
+// 		fmt.Fprintln(os.Stderr, err)
+// 		os.Exit(1)
+// 	}
+// 	fmt.Printf("http://%v -> %s\n", l.Addr(), dest)
 
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			log.Fatal(err)
-		}
+// 	for {
+// 		conn, err := l.Accept()
+// 		if err != nil {
+// 			log.Fatal(err)
+// 		}
 
-		fmt.Printf("Connection from %s\n", conn.RemoteAddr())
-		go proxy(conn, dest)
-	}
-}
+// 		fmt.Printf("Connection from %s\n", conn.RemoteAddr())
+// 		go proxy(conn, dest)
+// 	}
+// }
 
-func proxy(in net.Conn, dest string) {
-	out, err := net.Dial("tcp", dest)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+// func proxy(in net.Conn, dest string) {
+// 	out, err := net.Dial("tcp", dest)
+// 	if err != nil {
+// 		fmt.Fprintln(os.Stderr, err)
+// 		os.Exit(1)
+// 	}
 
-	go io.Copy(out, in)
-	io.Copy(in, out)
-	fmt.Printf("Disconnect from %s\n", in.RemoteAddr())
-}
+// 	go io.Copy(out, in)
+// 	io.Copy(in, out)
+// 	fmt.Printf("Disconnect from %s\n", in.RemoteAddr())
+// }
