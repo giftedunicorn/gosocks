@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -65,19 +64,19 @@ func getConfig() {
 func startLocal() {
 	l, err := net.Listen("tcp", localAddr)
 	if err != nil {
-		log.Println("failed to listen", err.Error())
+		log.Println("failed to listen", err)
 		os.Exit(1)
 	}
-	fmt.Printf("http://%v -> %s\n", l.Addr(), serverAddr)
+	log.Printf("http://%v -> %s\n", l.Addr(), serverAddr)
 
 	for {
 		c, err := l.Accept()
 		if err != nil {
-			log.Println("failed to accept: %s", err)
+			log.Printf("failed to accept: %s", err)
 			continue
 		}
 
-		fmt.Printf("Connection from %s\n", c.RemoteAddr())
+		log.Printf("Connection from %s\n", c.RemoteAddr())
 		go handleConnection(c)
 	}
 }
@@ -102,7 +101,7 @@ func handleConnection(c net.Conn) {
 	// reply
 	go io.Copy(rc, c)
 	io.Copy(c, rc)
-	fmt.Printf("Disconnect from %s\n", c.RemoteAddr())
+	log.Printf("Disconnect from %s\n", c.RemoteAddr())
 }
 
 func handshake(c net.Conn) (Addr, error) {
@@ -138,7 +137,6 @@ func handshake(c net.Conn) (Addr, error) {
 		return nil, Error(7)
 	}
 
-	log.Println("addr", addr)
 	return addr, err // skip VER, CMD, RSV fields
 }
 
@@ -176,7 +174,7 @@ func createServerConn(rawaddr []byte) (remote *ss.Conn, err error) {
 		log.Println("error connecting to shadowsocks server:", err)
 		return nil, err
 	}
-	log.Println("connected to %s via %s\n", server)
+	log.Printf("connected to %s via %s\n", server)
 	return
 }
 
